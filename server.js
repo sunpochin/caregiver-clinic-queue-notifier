@@ -362,16 +362,16 @@ function fetchClinicsForDept(deptCode, noon) {
     });
 }
 
-// 背景輪詢排程：定時更新所有監控任務並廣播給前端
+// 背景輪詢排程：定時並行更新所有監控任務並廣播給前端
 setInterval(async () => {
     if (monitors.length === 0) return;
     
     console.log('背景輪詢：開始更新所有監控中的診間進度...');
-    for (let monitor of monitors) {
-        if (!monitor.completed) {
-            await updateMonitor(monitor);
-        }
-    }
+    const activeMonitors = monitors.filter(m => !m.completed);
+    
+    // 使用 Promise.allSettled 進行並行請求，避免單一診間網路懸掛影響其他診間更新進度
+    await Promise.allSettled(activeMonitors.map(monitor => updateMonitor(monitor)));
+    
     broadcastUpdate();
 }, MONITOR_INTERVAL);
 
