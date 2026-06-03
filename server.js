@@ -78,6 +78,8 @@ function sendDiscordNotification(message) {
 
     const req = https.request(options, (res) => {
         console.log(`Discord 通知送出，狀態碼: ${res.statusCode}`);
+        // 釋放回應串流以釋放 underlying socket 連線，避免記憶體洩漏與連線懸掛
+        res.resume();
     });
 
     req.on('error', (err) => {
@@ -116,6 +118,8 @@ function sendTelegramNotification(message) {
 
     const req = https.request(options, (res) => {
         console.log(`Telegram 通知送出，狀態碼: ${res.statusCode}`);
+        // 釋放回應串流以釋放 underlying socket 連線，避免記憶體洩漏與連線懸掛
+        res.resume();
     });
 
     req.on('error', (err) => {
