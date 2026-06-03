@@ -406,13 +406,34 @@ app.get('/api/monitors', (req, res) => {
 app.post('/api/monitors', async (req, res) => {
     const { deptCode, noon, clinicName, doctorName, targetNumber, alertThreshold, isMock } = req.body;
 
+    // [技術] 檢查必要欄位是否存在，確保請求參數完整
+    // [小朋友] 看看該填的格子是不是都有填好，不能少填任何一樣喔！
     if (!deptCode || !noon || !clinicName || !targetNumber) {
         return res.status(400).json({ error: '欄位填寫不完整，請確認 deptCode, noon, clinicName, targetNumber 皆有填寫' });
+    }
+
+    // [技術] 轉換輸入參數為整數，並驗證是否為合法的正整數 (大於 0 的有效數字)
+    // [小朋友] 把輸入的文字轉換成乖乖的數字，並且檢查它是不是大於 0 的正整數，不可以亂輸入喔！
+    const parsedTargetNumber = parseInt(targetNumber);
+    const parsedAlertThreshold = parseInt(alertThreshold) || 3;
+
+    // [技術] 若掛號號碼轉換失敗 (NaN) 或小於等於 0，則回傳 400 錯誤以進行防呆攔截，防止 NaN 造成比較失效
+    // [小朋友] 如果掛號號碼不是數字，或者是 0 或負數，小幫手會看不懂，所以要退貨叫你重填！
+    if (isNaN(parsedTargetNumber) || parsedTargetNumber <= 0) {
+        return res.status(400).json({ error: '掛號號碼必須是正整數' });
+    }
+
+    // [技術] 若提醒號碼轉換失敗 (NaN) 或小於等於 0，則回傳 400 錯誤，防止 NaN 造成比較失效
+    // [小朋友] 如果提前通知的號數亂填，小幫手也會搞糊塗，所以也要防呆檢查！
+    if (isNaN(parsedAlertThreshold) || parsedAlertThreshold <= 0) {
+        return res.status(400).json({ error: '提前通知號數必須是正整數' });
     }
 
     const id = Date.now().toString();
     const formattedTime = new Date().toLocaleTimeString('zh-TW', { hour12: false });
     
+    // [技術] 建立全新的監控物件，此處 targetNumber 與 alertThreshold 已確認為合法數值
+    // [小朋友] 做一個全新的排隊小卡片，把整理好的數字和診間名字牢牢寫在卡片上
     const newMonitor = {
         id,
         deptCode,
@@ -420,8 +441,8 @@ app.post('/api/monitors', async (req, res) => {
         noon,
         clinicName: clinicName.trim(),
         doctorName: (doctorName || '').trim() || '未指定',
-        targetNumber: parseInt(targetNumber),
-        alertThreshold: parseInt(alertThreshold) || 3,
+        targetNumber: parsedTargetNumber,
+        alertThreshold: parsedAlertThreshold,
         currentSeq: isMock ? '1' : '讀取中',
         status: isMock ? '模擬排隊中' : '初始化',
         lastUpdated: formattedTime,
