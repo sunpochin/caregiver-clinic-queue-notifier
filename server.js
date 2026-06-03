@@ -267,9 +267,11 @@ async function updateMonitor(monitor) {
         if (seqStr === '結束看診' || seqStr.includes('結束')) {
             monitor.status = '結束看診';
             monitor.completed = true;
+            triggerAlert(monitor, '結束看診', `此診間今日看診已結束。`);
         } else if (seqStr === '休診') {
             monitor.status = '休診';
             monitor.completed = true;
+            triggerAlert(monitor, '休診', `此診間今日休診。`);
         } else if (!isNaN(seqVal)) {
             const diff = targetVal - seqVal;
             if (seqVal === targetVal) {
@@ -480,6 +482,11 @@ app.post('/api/monitors', async (req, res) => {
 
     monitors.push(newMonitor);
     console.log(`新增監控任務成功: ${newMonitor.clinicName}`);
+    
+    // 發送監控啟動確認通知至 Discord/Telegram，給予照護者安心確認
+    const initMessage = `📢 *[高醫看診監控已啟動]*\n\n📌 *診間*: ${newMonitor.clinicName} (${newMonitor.doctorName} 醫師)\n🔢 *您的號碼*: ${newMonitor.targetNumber} 號\n📈 *目前進度*: ${newMonitor.currentSeq} 號\n🔔 *提醒設定*: 提前 ${newMonitor.alertThreshold} 號通知\n⚙️ *模式*: ${newMonitor.isMock ? '🧪 模擬模式' : '🏥 即時監控'}`;
+    sendDiscordNotification(initMessage);
+    sendTelegramNotification(initMessage);
     
     // 通知所有客戶端
     broadcastUpdate();
