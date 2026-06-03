@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-TW" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" value="notranslate">
+    <title>高醫看診進度通知器 - 照護者專用</title>
+    
+    <!-- 網頁描述 (SEO 優化) -->
+    <meta name="description" content="專為照護者設計的高雄醫學大學附設中和紀念醫院 (高醫) 看診進度即時監控通知系統，免驗證碼、免個資，支援 Discord/Telegram 與瀏覽器系統通知與警報音效。">
+    
+    <!-- 引入高品質字型與 Icon 圖標 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 引入主樣式表 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 頂部導覽列與標題 -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-house-medical-circle-exclamation"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>高醫看診進度通知器</h1>
+                    <p>Caregiver Clinic Queue Notifier</p>
+                </div>
+            </div>
+            
+            <!-- 系統連線狀態指示與測試按鈕 -->
+            <div class="system-status-panel">
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot disconnected"></span>
+                    <span class="status-text" id="statusText">連線中斷</span>
+                </div>
+                <button class="btn btn-secondary" id="btnTestNotify" title="測試通知管道是否暢通">
+                    <i class="fa-solid fa-paper-plane"></i> 測試通知
+                </button>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <!-- 左側設定區域 -->
+            <section class="config-section">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-circle-plus"></i> 新增看診監控</h2>
+                        <p>輸入今日看診資訊，系統將自動啟動每分鐘背景監控</p>
+                    </div>
+                    
+                    <form id="monitorForm" class="monitor-form">
+                        <!-- 科別選擇 -->
+                        <div class="form-group">
+                            <label for="deptSelect"><i class="fa-solid fa-stethoscope"></i> 看診科別</label>
+                            <select id="deptSelect" class="form-control" required>
+                                <option value="" disabled selected>載入科別中...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 診次選擇 -->
+                        <div class="form-group">
+                            <label for="noonSelect"><i class="fa-solid fa-clock"></i> 看診時段 (午別)</label>
+                            <select id="noonSelect" class="form-control" required>
+                                <option value="AM">上午診 (08:30 - 12:00)</option>
+                                <option value="PM" selected>下午診 (13:30 - 17:00)</option>
+                                <option value="Night">夜間診 (17:30 - 21:00)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 診間名稱 (防呆選單) -->
+                        <div class="form-group">
+                            <label for="clinicSelect"><i class="fa-solid fa-door-open"></i> 選擇診間</label>
+                            <select id="clinicSelect" class="form-control" required disabled>
+                                <option value="" disabled selected>請先選擇科別與時段...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 手動輸入診間名稱 (預設隱藏，僅在選擇手動輸入時顯示) -->
+                        <div class="form-group" id="customClinicGroup" style="display: none;">
+                            <label for="clinicInput"><i class="fa-solid fa-keyboard"></i> 手動輸入診間名稱 / 代碼</label>
+                            <input type="text" id="clinicInput" class="form-control" placeholder="例如：神經外科">
+                            <small class="form-hint">請輸入高醫網頁上顯示的正確診間完整名稱</small>
+                        </div>
+                        
+                        <!-- 醫生姓名 (選填) -->
+                        <div class="form-group">
+                            <label for="doctorInput"><i class="fa-solid fa-user-doctor"></i> 醫生姓名 (選填)</label>
+                            <input type="text" id="doctorInput" class="form-control" placeholder="例如：何文譽 (不填則由系統比對)">
+                        </div>
+                        
+                        <!-- 掛號號碼與提示門檻 -->
+                        <div class="form-row">
+                            <div class="form-group col">
+                                <label for="targetNumberInput"><i class="fa-solid fa-ticket"></i> 您的掛號號碼</label>
+                                <input type="number" id="targetNumberInput" class="form-control" min="1" placeholder="例如：32" required>
+                            </div>
+                            <div class="form-group col">
+                                <label for="thresholdInput"><i class="fa-solid fa-bell-concierge"></i> 提前幾號通知</label>
+                                <input type="number" id="thresholdInput" class="form-control" min="1" max="10" value="3" required>
+                            </div>
+                        </div>
+                        
+                        <!-- 模擬模式開關 -->
+                        <div class="form-group toggle-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mockModeCheckbox">
+                                <span class="slider round"></span>
+                            </label>
+                            <div class="toggle-label">
+                                <span class="toggle-title">啟用模擬測試模式 (Mock Mode)</span>
+                                <span class="toggle-desc">勾選後可用於無看診日進行警報與通知流程測試</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 提交按鈕 -->
+                        <button type="submit" class="btn btn-primary" id="btnSubmit">
+                            <i class="fa-solid fa-play"></i> 開始監控進度
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 右側監控清單區域 -->
+            <section class="monitors-section">
+                <div class="section-title-row">
+                    <h2><i class="fa-solid fa-display"></i> 即時監控看板</h2>
+                    <span class="badge" id="monitorCountBadge">0 個任務</span>
+                </div>
+                
+                <!-- 監控卡片容器 -->
+                <div class="monitors-grid" id="monitorsGrid">
+                    <!-- 預設無監控時的 Placeholder -->
+                    <div class="empty-state-card" id="emptyState">
+                        <div class="empty-icon">
+                            <i class="fa-solid fa-hourglass-empty"></i>
+                        </div>
+                        <h3>目前沒有監控中的診間</h3>
+                        <p>請於左側輸入當天的門診與您的掛號號次，並點擊「開始監控」按鈕。</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 頁尾 -->
+        <footer class="app-footer">
+            <p>© 2026 高醫看診進度通知器 • 照護者家庭必備小工具</p>
+            <p class="footer-note">本工具資料源自高醫網路公開看診進度網頁，僅供看診順序之參考，實際叫號仍以診間外燈號為準。</p>
+        </footer>
+    </div>
+
+    <!-- 隱藏的 Audio 播放器作備用 -->
+    <audio id="alertAudio" preload="none"></audio>
+
+    <!-- 引入前端主邏輯 -->
+    <script src="app.js"></script>
+</body>
+</html>

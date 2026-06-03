@@ -1,0 +1,16 @@
+{
+  "name": "caregiver-clinic-queue-notifier",
+  "version": "1.0.0",
+  "description": "KMUH Clinic Queue Notifier for Caregivers",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pm2": "^7.0.1"
+  },
+  "private": true
+}
