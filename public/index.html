@@ -72,11 +72,19 @@
                             </select>
                         </div>
                         
-                        <!-- 診間名稱 -->
+                        <!-- 診間名稱 (防呆選單) -->
                         <div class="form-group">
-                            <label for="clinicInput"><i class="fa-solid fa-door-open"></i> 診間名稱 / 診號代碼</label>
-                            <input type="text" id="clinicInput" class="form-control" placeholder="例如：一般醫學內科1診 或 0119" required>
-                            <small class="form-hint">請輸入完整或部分診間名稱，如「胃腸內科1診」或「0101」</small>
+                            <label for="clinicSelect"><i class="fa-solid fa-door-open"></i> 選擇診間</label>
+                            <select id="clinicSelect" class="form-control" required disabled>
+                                <option value="" disabled selected>請先選擇科別與時段...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 手動輸入診間名稱 (預設隱藏，僅在選擇手動輸入時顯示) -->
+                        <div class="form-group" id="customClinicGroup" style="display: none;">
+                            <label for="clinicInput"><i class="fa-solid fa-keyboard"></i> 手動輸入診間名稱 / 代碼</label>
+                            <input type="text" id="clinicInput" class="form-control" placeholder="例如：神經外科">
+                            <small class="form-hint">請輸入高醫網頁上顯示的正確診間完整名稱</small>
                         </div>
                         
                         <!-- 醫生姓名 (選填) -->

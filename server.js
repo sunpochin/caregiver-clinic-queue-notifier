@@ -295,6 +295,67 @@ async function updateMonitor(monitor) {
     }
 }
 
+// 輔助函式：取得特定科別與時段的所有診間清單
+function fetchClinicsForDept(deptCode, noon) {
+    return new Promise((resolve, reject) => {
+        const url = 'https://www.kmuh.org.tw/Web/WebRegistration/OPDSeq/GetSeqDetial';
+        const postData = querystring.stringify({
+            VirtualDept: deptCode,
+            Noon: noon
+        });
+
+        const options = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(url, options, (res) => {
+            let html = '';
+            res.on('data', (chunk) => html += chunk);
+            res.on('end', () => {
+                if (res.statusCode !== 200) {
+                    return reject(new Error(`伺服器回應錯誤碼: ${res.statusCode}`));
+                }
+
+                const clinicRegex = /<div[^>]*class="[^"]*c_table[^"]*"[^>]*data-dept="([^"]+)"[^>]*data-dname="([^"]+)"[\s\S]*?<span[^>]*class="DocName"[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span[^>]*class="TakeDocName"[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span[^>]*class="Title\s+OrderStatus"[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span[^>]*class="Title\s+CurrentSeq"[^>]*>([\s\S]*?)<\/span>/g;
+                
+                let match;
+                const clinics = [];
+
+                while ((match = clinicRegex.exec(html)) !== null) {
+                    const parsedDeptCode = match[1].trim();
+                    const parsedClinicName = match[2].trim();
+                    const parsedDoctor = match[3].trim();
+                    const parsedSubDoctor = match[4].trim();
+                    const parsedStatus = match[5].trim();
+                    const parsedSeq = match[6].trim();
+
+                    clinics.push({
+                        deptCode: parsedDeptCode,
+                        clinicName: parsedClinicName,
+                        doctorName: parsedDoctor || parsedSubDoctor || '未指定',
+                        status: parsedStatus,
+                        currentSeq: parsedSeq
+                    });
+                }
+                resolve(clinics);
+            });
+        });
+
+        req.on('error', (err) => {
+            reject(err);
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
 // 背景輪詢排程：定時更新所有監控任務並廣播給前端
 setInterval(async () => {
     if (monitors.length === 0) return;
@@ -313,6 +374,21 @@ setInterval(async () => {
 // 1. 取得科別代碼對照表
 app.get('/api/depts', (req, res) => {
     res.json(DEPARTMENTS);
+});
+
+// 1.5 取得指定科別與時段的診間列表 (用於前端防呆選單)
+app.get('/api/clinics', async (req, res) => {
+    const { deptCode, noon } = req.query;
+    if (!deptCode || !noon) {
+        return res.status(400).json({ error: '請提供 deptCode 與 noon 參數' });
+    }
+    try {
+        const clinics = await fetchClinicsForDept(deptCode, noon);
+        res.json(clinics);
+    } catch (err) {
+        console.error('取得診間列表失敗:', err.message);
+        res.status(500).json({ error: '無法自高醫取得診間列表，請嘗試手動輸入' });
+    }
 });
 
 // 2. 取得所有監控中的任務

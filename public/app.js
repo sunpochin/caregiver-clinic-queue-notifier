@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 獲取 DOM 元素
     const deptSelect = document.getElementById('deptSelect');
     const noonSelect = document.getElementById('noonSelect');
+    const clinicSelect = document.getElementById('clinicSelect');
+    const customClinicGroup = document.getElementById('customClinicGroup');
     const clinicInput = document.getElementById('clinicInput');
     const doctorInput = document.getElementById('doctorInput');
     const targetNumberInput = document.getElementById('targetNumberInput');
@@ -117,6 +119,87 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     loadDepartments();
+
+    // 4.5 根據所選科別與時段動態獲取診間列表 (防呆選單)
+    async function loadClinics() {
+        const deptCode = deptSelect.value;
+        const noon = noonSelect.value;
+
+        if (!deptCode || !noon) return;
+
+        clinicSelect.disabled = true;
+        clinicSelect.innerHTML = '<option value="" disabled selected>正在抓取高醫最新診間列表...</option>';
+        customClinicGroup.style.display = 'none';
+        clinicInput.required = false;
+        clinicInput.value = '';
+        doctorInput.value = '';
+
+        try {
+            const res = await fetch(`/api/clinics?deptCode=${deptCode}&noon=${noon}`);
+            if (!res.ok) throw new Error('API 回應異常');
+            
+            const clinics = await res.json();
+
+            clinicSelect.innerHTML = '<option value="" disabled>請選擇看診診間...</option>';
+            
+            if (clinics.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '__custom__';
+                opt.textContent = '⚠️ 本時段無診間開放 (改手動輸入)';
+                clinicSelect.appendChild(opt);
+                
+                // 自動切換為手動輸入
+                clinicSelect.value = '__custom__';
+                customClinicGroup.style.display = 'block';
+                clinicInput.required = true;
+            } else {
+                clinics.forEach(clinic => {
+                    const opt = document.createElement('option');
+                    opt.value = clinic.clinicName;
+                    opt.dataset.doctor = clinic.doctorName;
+                    opt.textContent = `${clinic.clinicName} (${clinic.doctorName} 醫師 / 目前叫號：${clinic.currentSeq} 號)`;
+                    clinicSelect.appendChild(opt);
+                });
+
+                // 新增手動輸入備用選項
+                const optCustom = document.createElement('option');
+                optCustom.value = '__custom__';
+                optCustom.textContent = '➕ 手動輸入其他診間...';
+                clinicSelect.appendChild(optCustom);
+            }
+            // 預設不選取任何值，強迫使用者做選擇
+            clinicSelect.selectedIndex = 0;
+            clinicSelect.disabled = false;
+        } catch (err) {
+            console.warn('動態獲取診間列表失敗，切換為手動輸入模式:', err);
+            clinicSelect.innerHTML = '<option value="__custom__" selected>⚠️ 無法取得列表 (手動輸入)</option>';
+            clinicSelect.disabled = false;
+            customClinicGroup.style.display = 'block';
+            clinicInput.required = true;
+        }
+    }
+
+    // 監聽科別與時段異動
+    deptSelect.addEventListener('change', loadClinics);
+    noonSelect.addEventListener('change', loadClinics);
+
+    // 監聽診間下拉選單選擇事件
+    clinicSelect.addEventListener('change', () => {
+        if (clinicSelect.value === '__custom__') {
+            customClinicGroup.style.display = 'block';
+            clinicInput.required = true;
+            clinicInput.focus();
+            doctorInput.value = '';
+        } else {
+            customClinicGroup.style.display = 'none';
+            clinicInput.required = false;
+            clinicInput.value = clinicSelect.value;
+            
+            // 自動帶入醫生姓名
+            const selectedOpt = clinicSelect.options[clinicSelect.selectedIndex];
+            doctorInput.value = selectedOpt.dataset.doctor || '';
+        }
+    });
 
     // 5. 建立 SSE 實時連線
     function connectSSE() {
@@ -353,14 +436,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const deptCode = deptSelect.value;
         const noon = noonSelect.value;
-        const clinicName = clinicInput.value;
-        const doctorName = doctorInput.value;
+        
+        // 診間名稱判斷：若是自訂則取輸入框的值，否則取下拉選單的值
+        let clinicName = '';
+        if (clinicSelect.value === '__custom__') {
+            clinicName = clinicInput.value.trim();
+        } else {
+            clinicName = clinicSelect.value;
+        }
+
+        const doctorName = doctorInput.value.trim();
         const targetNumber = targetNumberInput.value;
         const alertThreshold = thresholdInput.value;
         const isMock = mockModeCheckbox.checked;
 
         if (!deptCode || !noon || !clinicName || !targetNumber) {
-            alert('請完整填寫所有必要欄位！');
+            alert('請完整填寫所有必要欄位，並確認診間名稱已輸入！');
             return;
         }
 
