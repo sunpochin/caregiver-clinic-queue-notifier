@@ -577,20 +577,32 @@ app.post('/api/monitors/:id/mock-tick', async (req, res) => {
 
 // 7. 伺服器發送事件 (SSE) 連線點，供前端進行即時單向推送
 app.get('/api/events', (req, res) => {
+    // [技術] 設定 HTTP 表頭，確保瀏覽器將此連線視為持久性事件串流 (Event Stream)，並關閉快取與代理緩衝
+    // [小朋友] 告訴瀏覽器說：「這是一條打電話不掛斷的專線，請不要偷偷存起來或是藏在箱子裡，要隨時聽好喔！」
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // [技術] 關閉 Nginx 反向代理的快取緩衝，確保訊息能即時送達；[小朋友] 叫 Nginx 傳送員不要累積一大堆信才送，要一有信就送！
     res.flushHeaders();
 
     console.log('前端客戶端已成功連接至即時更新通道 (SSE)');
     sseClients.push(res);
 
-    // 首次連線時立即傳送目前的監控清單
+    // [技術] 每 20 秒發送一個心跳註解 (:\n\n)，防止防火牆或代理伺服器因長時間無活動而自動中斷 TCP 連線
+    // [小朋友] 每隔 20 秒輕輕拉一下繩子「:\n\n」（心跳），讓路上的守衛知道電話還在講，沒有壞掉喔！
+    const heartbeatInterval = setInterval(() => {
+        res.write(':\n\n');
+    }, 20000);
+
+    // [技術] 首次連線時立即將目前的監控任務列表發送給前端
+    // [小朋友] 當電話一接通，立刻把目前所有的看診小卡片名單報給電話那一頭的人聽
     res.write(`data: ${JSON.stringify(monitors)}\n\n`);
 
-    // 連線中斷時清除該連線
+    // [技術] 監聽用戶端連線中斷事件，清除心跳計時器並將該 response 物件自 client 列表中移除
+    // [小朋友] 當那頭的人掛掉電話，我們就要把計時器小鬧鐘關掉，並把這個電話從名單上擦掉
     req.on('close', () => {
         console.log('前端連線中斷，正在清除 SSE 用戶端');
+        clearInterval(heartbeatInterval);
         sseClients = sseClients.filter(client => client !== res);
     });
 });
